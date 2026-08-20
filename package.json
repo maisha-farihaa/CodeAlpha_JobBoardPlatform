@@ -1,0 +1,17 @@
+{
+  "name": "codealpha-job-board",
+  "version": "1.0.0",
+  "description": "CodeAlpha Backend Development Internship - Task 4: Job Board Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "sql.js": "^1.10.3",
+    "multer": "^2.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5"
+  }
+}
