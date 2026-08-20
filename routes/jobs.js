@@ -42,6 +42,8 @@ router.get('/:id', (req, res) => {
 
   res.json(job);
 });
+
+
 // POST /api/jobs - post a new job listing
 router.post('/', (req, res) => {
   const { employer_name, employer_email, title, description, location, job_type, salary_range } = req.body;
@@ -61,3 +63,21 @@ router.post('/', (req, res) => {
   const newJob = selectOne('SELECT * FROM jobs ORDER BY id DESC LIMIT 1');
   res.status(201).json(newJob);
 });
+
+// DELETE /api/jobs/:id - employer removes their own listing
+router.delete('/:id', (req, res) => {
+  const job = selectOne('SELECT * FROM jobs WHERE id = ?', [req.params.id]);
+
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found.' });
+  }
+
+  const db = getDb();
+  db.run('DELETE FROM applications WHERE job_id = ?', [req.params.id]);
+  db.run('DELETE FROM jobs WHERE id = ?', [req.params.id]);
+  saveDb();
+
+  res.json({ message: 'Job listing removed.' });
+});
+
+module.exports = router;
