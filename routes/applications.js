@@ -69,3 +69,44 @@ router.get('/applications', (req, res) => {
 
   res.json(rows);
 });
+
+// GET /api/jobs/:id/applications - employer views applicants for one job
+router.get('/jobs/:id/applications', (req, res) => {
+  const rows = selectAll(
+    'SELECT * FROM applications WHERE job_id = ? ORDER BY created_at DESC',
+    [req.params.id]
+  );
+  res.json(rows);
+});
+
+// PATCH /api/applications/:id/status - employer updates an application's status
+router.patch('/applications/:id/status', (req, res) => {
+  const { status } = req.body;
+  const validStatuses = ['applied', 'reviewed', 'accepted', 'rejected'];
+
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: `status must be one of: ${validStatuses.join(', ')}` });
+  }
+
+  const existing = selectOne('SELECT * FROM applications WHERE id = ?', [req.params.id]);
+  if (!existing) {
+    return res.status(404).json({ error: 'Application not found.' });
+  }
+
+  const db = getDb();
+  db.run('UPDATE applications SET status = ? WHERE id = ?', [status, req.params.id]);
+  saveDb();
+
+  const updated = selectOne('SELECT * FROM applications WHERE id = ?', [req.params.id]);
+  res.json(updated);
+});
+
+// GET /api/resumes/:filename - download a resume file
+router.get('/resumes/:filename', (req, res) => {
+  const filePath = path.join(__dirname, '..', 'uploads', req.params.filename);
+  res.download(filePath, (err) => {
+    if (err) res.status(404).json({ error: 'Resume not found.' });
+  });
+});
+
+module.exports = router;
