@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Board — CodeAlpha</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Job Board</h1>
+
+  <div class="form-row">
+    <input type="text" id="searchInput" placeholder="Search job title or keyword">
+    <input type="text" id="locationInput" placeholder="Location">
+    <button id="searchBtn">Search</button>
+  </div>
+
+  <button class="toggle-form-btn" id="togglePostBtn">+ Post a Job</button>
+
+  <div class="card" id="postJobForm">
+    <input type="text" id="employerName" placeholder="Company name">
+    <input type="text" id="employerEmail" placeholder="Company email">
+    <input type="text" id="jobTitle" placeholder="Job title">
+    <textarea id="jobDescription" placeholder="Job description"></textarea>
+    <div class="form-row">
+      <input type="text" id="jobLocation" placeholder="Location">
+      <select id="jobType">
+        <option>Full-time</option>
+        <option>Part-time</option>
+        <option>Internship</option>
+        <option>Contract</option>
+      </select>
+    </div>
+    <input type="text" id="salaryRange" placeholder="Salary range (optional)">
+    <button id="postJobBtn">Post Job</button>
+    <div class="msg" id="postMsg"></div>
+  </div>
+
+  <div id="jobsList"></div>
+
+  <h2>Check my applications</h2>
+  <div class="lookup-row">
+    <input type="text" id="lookupEmail" placeholder="your@email.com">
+    <button id="lookupBtn">View</button>
+  </div>
+  <div id="myApplications"></div>
+</div>
+
+<script>
+  const searchInput = document.getElementById('searchInput');
+  const locationInput = document.getElementById('locationInput');
+  const searchBtn = document.getElementById('searchBtn');
+  const jobsList = document.getElementById('jobsList');
+
+  const togglePostBtn = document.getElementById('togglePostBtn');
+  const postJobForm = document.getElementById('postJobForm');
+  const postJobBtn = document.getElementById('postJobBtn');
+  const postMsg = document.getElementById('postMsg');
+
+  const lookupBtn = document.getElementById('lookupBtn');
+  const lookupEmail = document.getElementById('lookupEmail');
+  const myApplications = document.getElementById('myApplications');
+
+  togglePostBtn.addEventListener('click', () => {
+    postJobForm.classList.toggle('open');
+  });
+
+  searchBtn.addEventListener('click', () => loadJobs());
+
+  postJobBtn.addEventListener('click', async () => {
+    const employer_name = document.getElementById('employerName').value.trim();
+    const employer_email = document.getElementById('employerEmail').value.trim();
+    const title = document.getElementById('jobTitle').value.trim();
+    const description = document.getElementById('jobDescription').value.trim();
+    const location = document.getElementById('jobLocation').value.trim();
+    const job_type = document.getElementById('jobType').value;
+    const salary_range = document.getElementById('salaryRange').value.trim();
+
+    postMsg.textContent = '';
+
+    if (!employer_name || !employer_email || !title) {
+      postMsg.textContent = 'Company name, email, and job title are required.';
+      postMsg.className = 'msg err';
+      return;
+    }
+
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employer_name, employer_email, title, description, location, job_type, salary_range })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      postMsg.textContent = data.error;
+      postMsg.className = 'msg err';
+      return;
+    }
+
+    postMsg.textContent = 'Job posted!';
+    postMsg.className = 'msg ok';
+
+    ['employerName', 'employerEmail', 'jobTitle', 'jobDescription', 'jobLocation', 'salaryRange']
+      .forEach(id => document.getElementById(id).value = '');
+
+    loadJobs();
+  });
+
+  async function loadJobs() {
+    const params = new URLSearchParams();
+    if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+    if (locationInput.value.trim()) params.set('location', locationInput.value.trim());
+
+    const res = await fetch(`/api/jobs?${params.toString()}`);
+    const jobs = await res.json();
+
+    if (jobs.length === 0) {
+      jobsList.innerHTML = '<p class="empty-state">No jobs found.</p>';
+      return;
+    }
+
+    jobsList.innerHTML = jobs.map(job => `
+      <div class="card">
+        <div class="job-title">${job.title}</div>
+        <div class="job-meta">${job.employer_name} · ${job.location || 'Remote'}</div>
+        <span class="job-badge">${job.job_type}</span>
+        ${job.salary_range ? `<span class="job-badge">${job.salary_range}</span>` : ''}
+        <p style="margin-top:12px;">${job.description || ''}</p>
+
+        <input type="text" id="cname-${job.id}" placeholder="Your name">
+        <input type="text" id="cemail-${job.id}" placeholder="Your email">
+        <textarea id="cletter-${job.id}" placeholder="Cover letter (optional)"></textarea>
+        <input type="file" id="cresume-${job.id}">
+        <button onclick="apply(${job.id})">Apply</button>
+        <button class="delete-btn" onclick="removeJob(${job.id})">Remove Listing</button>
+        <div class="msg" id="msg-${job.id}"></div>
+      </div>
+    `).join('');
+  }
+
+  async function apply(jobId) {
+    const name = document.getElementById(`cname-${jobId}`).value.trim();
+    const email = document.getElementById(`cemail-${jobId}`).value.trim();
+    const letter = document.getElementById(`cletter-${jobId}`).value.trim();
+    const resumeFile = document.getElementById(`cresume-${jobId}`).files[0];
+    const msg = document.getElementById(`msg-${jobId}`);
+    msg.textContent = '';
+
+    if (!name || !email) {
+      msg.textContent = 'Name and email are required.';
+      msg.className = 'msg err';
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('candidate_name', name);
+    formData.append('candidate_email', email);
+    formData.append('cover_letter', letter);
+    if (resumeFile) formData.append('resume', resumeFile);
+
+    const res = await fetch(`/api/jobs/${jobId}/apply`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      msg.textContent = data.error;
+      msg.className = 'msg err';
+      return;
+    }
+
+    msg.textContent = 'Application submitted!';
+    msg.className = 'msg ok';
+  }
+
+  async function removeJob(jobId) {
+    const res = await fetch(`/api/jobs/${jobId}`, { method: 'DELETE' });
+    if (res.ok) loadJobs();
+  }
+
+  lookupBtn.addEventListener('click', async () => {
+    const email = lookupEmail.value.trim();
+    if (!email) return;
+
+    const res = await fetch(`/api/applications?email=${encodeURIComponent(email)}`);
+    const rows = await res.json();
+
+    if (rows.length === 0) {
+      myApplications.innerHTML = '<p class="empty-state">No applications found.</p>';
+      return;
+    }
+
+    myApplications.innerHTML = rows.map(r => `
+      <div class="app-row">
+        <span>${r.title} — ${r.employer_name}</span>
+        <span class="status-pill status-${r.status}">${r.status}</span>
+      </div>
+    `).join('');
+  });
+
+  loadJobs();
+</script>
+</body>
+</html>
