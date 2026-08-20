@@ -42,3 +42,22 @@ router.get('/:id', (req, res) => {
 
   res.json(job);
 });
+// POST /api/jobs - post a new job listing
+router.post('/', (req, res) => {
+  const { employer_name, employer_email, title, description, location, job_type, salary_range } = req.body;
+
+  if (!employer_name || !employer_email || !title) {
+    return res.status(400).json({ error: 'employer_name, employer_email, and title are required.' });
+  }
+
+  const db = getDb();
+  db.run(
+    `INSERT INTO jobs (employer_name, employer_email, title, description, location, job_type, salary_range)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [employer_name, employer_email, title, description || '', location || '', job_type || 'Full-time', salary_range || '']
+  );
+  saveDb();
+
+  const newJob = selectOne('SELECT * FROM jobs ORDER BY id DESC LIMIT 1');
+  res.status(201).json(newJob);
+});
