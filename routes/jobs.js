@@ -29,3 +29,16 @@ router.get('/', (req, res) => {
   const jobs = selectAll(sql, params);
   res.json(jobs);
 });
+// GET /api/jobs/:id
+router.get('/:id', (req, res) => {
+  const job = selectOne('SELECT * FROM jobs WHERE id = ?', [req.params.id]);
+
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found.' });
+  }
+
+  const count = selectOne('SELECT COUNT(*) AS total FROM applications WHERE job_id = ?', [job.id]);
+  job.applicants = count.total;
+
+  res.json(job);
+});
